@@ -143,7 +143,7 @@ object HelloWorld extends App {
    * effect into another one that produces an exit code.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    putStrLn("hello world").exitCode
 }
 
 object SimpleMap extends App {
@@ -159,7 +159,7 @@ object SimpleMap extends App {
    * into a constant exit code by using `ZIO#as`.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    readLine.map(_.length).as(0).exitCode
 }
 
 object PrintSequenceZip extends App {
@@ -172,7 +172,7 @@ object PrintSequenceZip extends App {
    * that prints three lines of text to the console.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    (putStr("Hello") zip putStr(" World") zip putStrLn(" Renghen")).exitCode
 }
 
 object PrintSequence extends App {
@@ -185,7 +185,7 @@ object PrintSequence extends App {
    * produce an effect that prints three lines of text to the console.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    putStr("Hello") *> putStr(" World") *> putStrLn(" zipRight") *> ZIO.succeed(ExitCode.success)
 }
 
 object PrintReadSequence extends App {
@@ -201,7 +201,7 @@ object PrintReadSequence extends App {
    * effect, which models reading a line of text from the console.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    putStr("Hit Enter to exit...") *> readLine *> ZIO.succeed(ExitCode.success)
 }
 
 object SimpleDuplication extends App {
@@ -215,13 +215,10 @@ object SimpleDuplication extends App {
    * value that stores the expression, and then referencing that variable
    * three times.
    */
-  def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    // val effect = ???
-    putStrLn("Hello") *>
-      putStrLn("Hello again") *>
-      putStrLn("Hello again") *>
-      putStrLn("Hello again") *>
-      ZIO.succeed(ExitCode.success)
+  def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] = {
+    val effect = putStrLn("Hello again")
+    putStrLn("Hello") *> effect *> effect *> effect *> ZIO.succeed(ExitCode.success)
+  }
 }
 
 object FlatMap extends App {
@@ -244,9 +241,9 @@ object FlatMap extends App {
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     putStrLn("What is your name?") *>
-      readLine *> // Use .flatMap(...) here
-      putStrLn("Your name is: ") *>
+      readLine.flatMap(name => putStrLn(s"Your name is: $name")) *>
       ZIO.succeed(ExitCode.success)
+
 }
 
 object PromptName extends App {
@@ -278,7 +275,7 @@ object PromptName extends App {
     left: ZIO[R, E, A],
     right: ZIO[R, E, B]
   ): ZIO[R, E, B] =
-    ???
+    left.flatMap(_ => right)
 }
 
 object ForComprehension extends App {
