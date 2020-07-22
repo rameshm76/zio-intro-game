@@ -61,17 +61,25 @@ object ZIOModel {
    * Implement all missing methods on the ZIO class.
    */
   final case class ZIO[-R, +E, +A](run: R => Either[E, A]) { self =>
-    def map[B](f: A => B): ZIO[R, E, B] = ???
+    def map[B](f: A => B): ZIO[R, E, B] = ZIO(r => self.run(r).map(f))
 
     def flatMap[R1 <: R, E1 >: E, B](f: A => ZIO[R1, E1, B]): ZIO[R1, E1, B] =
-      ???
+      ZIO(r1 => self.run(r1).flatMap(a => f(a).run(r1)))
 
     def zip[R1 <: R, E1 >: E, B](that: ZIO[R1, E1, B]): ZIO[R1, E1, (A, B)] =
-      ???
+      ZIO(r =>
+        (self.run(r), that.run(r)) match {
+          case (Right(a1), Right(a2)) => Right((a1, a2))
+          case (Left(e), _)           => Left(e)
+          case (_, Left(e))           => Left(e)
+        }
+      )
+    // alternatively
+    // self.flatMap(t1 => that.map(t2 => (t1, t2)))
 
-    def either: ZIO[R, Nothing, Either[E, A]] = ???
+    def either: ZIO[R, Nothing, Either[E, A]] = ZIO(r => Right(self.run(r)))
 
-    def provide(r: R): ZIO[Any, E, A] = ???
+    def provide(r: R): ZIO[Any, E, A] = ZIO(_ => self.run(r))
 
     def orDie(implicit ev: E <:< Throwable): ZIO[R, Nothing, A] =
       ZIO(r => self.run(r).fold(throw _, Right(_)))
