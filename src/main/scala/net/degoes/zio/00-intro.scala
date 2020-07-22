@@ -352,7 +352,12 @@ object NumberGuesser extends App {
    * above.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    for {
+      rand  <- nextIntBetween(0, 100)
+      _     <- putStr("enter your guess > ")
+      guess <- readLine
+      _     <- analyzeAnswer(rand, guess)
+    } yield ExitCode.success
 }
 
 object SingleSideEffect extends App {
