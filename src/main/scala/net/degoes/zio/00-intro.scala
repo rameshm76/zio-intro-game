@@ -291,9 +291,14 @@ object ForComprehension extends App {
    * except for the final line, which will be translated into a `map`.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    putStrLn("What is your name?").flatMap(_ =>
-      readLine.flatMap(name => putStrLn(s"Your name is: ${name}").map(_ => ExitCode.success))
-    )
+    // putStrLn("What is your name?").flatMap(_ =>
+    //   readLine.flatMap(name => putStrLn(s"Your name is: ${name}").map(_ => ExitCode.success))
+    // )
+    for {
+      _    <- putStrLn("What is your name?")
+      name <- readLine
+      _    <- putStrLn(name)
+    } yield ExitCode.success
 }
 
 object ForComprehensionBackward extends App {
