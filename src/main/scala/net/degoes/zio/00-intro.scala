@@ -1,6 +1,7 @@
 package net.degoes.zio
 
 import zio._
+import scala.util.Try
 
 /*
  * INTRODUCTION
@@ -40,17 +41,18 @@ object ZIOModel {
    * Implement all missing methods on the ZIO companion object.
    */
   object ZIO {
-    def succeed[A](a: => A): ZIO[Any, Nothing, A] = ???
+    def succeed[A](a: => A): ZIO[Any, Nothing, A] = ZIO(_ => Right(a))
 
-    def fail[E](e: => E): ZIO[Any, E, Nothing] = ???
+    def fail[E](e: => E): ZIO[Any, E, Nothing] = ZIO(_ => Left(e))
 
-    def effect[A](sideEffect: => A): ZIO[Any, Throwable, A] = ???
+    def effect[A](sideEffect: => A): ZIO[Any, Throwable, A] =
+      ZIO(_ => Try(sideEffect).toEither)
 
-    def environment[R]: ZIO[R, Nothing, R] = ???
+    def environment[R]: ZIO[R, Nothing, R] = ZIO(env => Right(env))
 
-    def access[R, A](f: R => A): ZIO[R, Nothing, A] = ???
+    def access[R, A](f: R => A): ZIO[R, Nothing, A] = ZIO(env => Right(f(env)))
 
-    def accessM[R, E, A](f: R => ZIO[R, E, A]): ZIO[R, E, A] = ???
+    def accessM[R, E, A](f: R => ZIO[R, E, A]): ZIO[R, E, A] = ZIO(r => f(r).run(r))
   }
 
   /**
@@ -90,9 +92,7 @@ object ZIOModel {
    */
   def main(args: Array[String]): Unit =
     unsafeRun {
-      putStrLn("Hello, what is your name?").flatMap(
-        _ => readLine.flatMap(name => putStrLn(s"Your name is: ${name}"))
-      )
+      putStrLn("Hello, what is your name?").flatMap(_ => readLine.flatMap(name => putStrLn(s"Your name is: ${name}")))
     }
 }
 
@@ -286,8 +286,8 @@ object ForComprehension extends App {
    * except for the final line, which will be translated into a `map`.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    putStrLn("What is your name?").flatMap(
-      _ => readLine.flatMap(name => putStrLn(s"Your name is: ${name}").map(_ => ExitCode.success))
+    putStrLn("What is your name?").flatMap(_ =>
+      readLine.flatMap(name => putStrLn(s"Your name is: ${name}").map(_ => ExitCode.success))
     )
 }
 
