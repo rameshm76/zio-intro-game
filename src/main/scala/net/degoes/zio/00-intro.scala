@@ -315,12 +315,23 @@ object ForComprehensionBackward extends App {
    * which will translate to a `map`.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    for {
-      _   <- putStrLn("How old are you?")
-      age <- readInt
-      _ <- if (age < 18) putStrLn("You are a kid!")
-          else putStrLn("You are all grown up!")
-    } yield ExitCode.success
+    // for {
+    //   _   <- putStrLn("How old are you?")
+    //   age <- readInt
+    //   _ <- if (age < 18) putStrLn("You are a kid!")
+    //       else putStrLn("You are all grown up!")
+    // } yield ExitCode.success
+    putStrLn("How old are you?")
+      .flatMap(_ =>
+        readInt
+          .flatMap(age =>
+            if (age < 18)
+              putStrLn("You are a kid!")
+            else
+              putStrLn("You are all grown up!")
+          )
+          .map(_ => ExitCode.success)
+      )
 }
 
 object NumberGuesser extends App {
