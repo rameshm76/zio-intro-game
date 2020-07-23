@@ -13,10 +13,19 @@ object Looping extends App {
    * Implement a `repeat` combinator using `flatMap` (or `zipRight`) and recursion.
    */
   def repeat[R, E, A](n: Int)(effect: ZIO[R, E, A]): ZIO[R, E, Chunk[A]] =
-    ???
+    if (n > 1) {
+      //repeat(n - 1)(effect) *> effect.map(Chunk(_))
+      //(repeat(n - 1)(effect)).flatMap(chunk => effect.map(chunk :+ _))
+      for {
+        chunk <- repeat(n - 1)(effect)
+        a     <- effect
+      } yield chunk :+ a
+    } else {
+      effect.map(Chunk(_))
+    }
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    repeat(100)(putStrLn("All work and no play makes Jack a dull boy")).exitCode
+    repeat(5)(putStrLn("All work and no play makes Jack a dull boy")).exitCode
 }
 
 object Interview extends App {
@@ -37,8 +46,13 @@ object Interview extends App {
    */
   def getAllAnswers(questions: List[String]): ZIO[Console, IOException, List[String]] =
     questions match {
-      case Nil     => ???
-      case q :: qs => ???
+      case Nil     => ZIO.effect(List.empty[String]).refineToOrDie[IOException]
+      case q :: qs =>
+        //(putStr(q) *> getStrLn).flatMap(ans => getAllAnswers(qs).map(_ :+ ans))
+        for {
+          ans <- putStr(q) *> getStrLn
+          lst <- getAllAnswers(qs)
+        } yield ans :: lst
     }
 
   /**
@@ -48,7 +62,11 @@ object Interview extends App {
    * `questions`, to ask the user a bunch of questions, and print the answers.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    // getAllAnswers(questions).flatMap(lst => putStrLn(lst.mkString("\n"))).exitCode
+    (for {
+      answers <- getAllAnswers(questions)
+      _       <- putStrLn(answers.mkString("\n"))
+    } yield ()).exitCode
 }
 
 object InterviewGeneric extends App {
@@ -68,12 +86,14 @@ object InterviewGeneric extends App {
    */
   def iterateAndCollect[R, E, A, B](as: List[A])(f: A => ZIO[R, E, B]): ZIO[R, E, List[B]] =
     as match {
-      case Nil     => ???
-      case a :: as => ???
+      case Nil     => ZIO.succeed(List.empty[B])
+      case a :: as => f(a).flatMap(ans => iterateAndCollect(as)(f).map(_ :+ ans))
     }
 
+  def qNa(question: String) = putStr(question) *> getStrLn
+
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    iterateAndCollect(questions)(qNa(_)).flatMap(lst => putStrLn(lst.mkString("\n"))).exitCode
 }
 
 object InterviewForeach extends App {
@@ -94,7 +114,10 @@ object InterviewForeach extends App {
    * out the contents of the collection.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    ZIO
+      .foreach(questions)(q => putStr(q) *> getStrLn)
+      .flatMap(ans => putStrLn(ans.mkString("\n")))
+      .exitCode
 }
 
 object WhileLoop extends App {
@@ -105,8 +128,19 @@ object WhileLoop extends App {
    *
    * Implement the functional effect version of a while loop.
    */
-  def whileLoop[R, E, A](cond: UIO[Boolean])(zio: ZIO[R, E, A]): ZIO[R, E, Chunk[A]] =
-    ???
+  def whileLoop[R, E, A](cond: UIO[Boolean])(zio: ZIO[R, E, A]): ZIO[R, E, Chunk[A]] = {
+
+    def whileFun(chunk: Chunk[A]): ZIO[R, E, Chunk[A]] =
+      cond.flatMap(bool =>
+        if (bool) {
+          zio.flatMap(result => whileFun(Chunk(result) ++ chunk))
+        } else {
+          ZIO.succeed(chunk)
+        }
+      )
+
+    whileFun(Chunk.empty)
+  }
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] = {
     def loop(variable: Ref[Int]) =
@@ -135,12 +169,14 @@ object Iterate extends App {
    * evaluates to false, returning the "last" value of type `A`.
    */
   def iterate[R, E, A](start: A)(cond: A => Boolean)(f: A => ZIO[R, E, A]): ZIO[R, E, A] =
-    ???
+    if (cond(start)) {
+      f(start).flatMap(result => iterate(result)(cond)(f))
+    } else {
+      ZIO.succeed(start)
+    }
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    iterate(0)(_ < 100) { i =>
-      putStrLn(s"At iteration: ${i}") as (i + 1)
-    }.exitCode
+    iterate(0)(_ < 100)(i => putStrLn(s"At iteration: ${i}") as (i + 1)).exitCode
 }
 
 object TailRecursive extends App {
