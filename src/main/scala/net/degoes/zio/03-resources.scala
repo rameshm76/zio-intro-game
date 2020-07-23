@@ -5,6 +5,7 @@ import java.text.NumberFormat
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import scala.io.Source
 
 object Cat extends App {
   import zio.console._
@@ -18,7 +19,7 @@ object Cat extends App {
    * blocking thread pool, storing the result into a string.
    */
   def readFile(file: String): ZIO[Blocking, IOException, String] =
-    ???
+    effectBlockingIO(Source.fromFile(file).getLines().mkString("\n"))
 
   /**
    * EXERCISE
@@ -27,7 +28,7 @@ object Cat extends App {
    * contents of the specified file to standard output.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    readFile(args(1)).flatMap(content => putStrLn(content)).exitCode
 }
 
 object CatBracket extends App {
@@ -39,8 +40,9 @@ object CatBracket extends App {
   def open(file: String): ZIO[Blocking, IOException, Source] =
     effectBlockingIO(scala.io.Source.fromFile(file))
 
-  def close(source: Source): ZIO[Blocking, IOException, Unit] =
-    effectBlockingIO(source.close())
+  //had to rewrite the new close function
+  def close(source: Source) =
+    ZIO.succeed(source.close())
 
   /**
    * EXERCISE
@@ -49,7 +51,8 @@ object CatBracket extends App {
    * fail to close the file, no matter what happens during reading.
    */
   def readFile(file: String): ZIO[Blocking, IOException, String] =
-    ???
+    open(file)
+      .bracket(f => close(f))(fileSource => effectBlockingIO(fileSource.getLines().mkString("\n")))
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     (for {
