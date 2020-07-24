@@ -152,8 +152,18 @@ object CatIncremental extends App {
    * it is impossible to forget to close an open handle.
    */
   object FileHandle {
-    final def open(file: String): ZIO[Blocking, IOException, FileHandle] =
+    private final def open(file: String): ZIO[Blocking, IOException, FileHandle] =
       effectBlockingIO(new FileHandle(new FileInputStream(file)))
+
+    final def make(file: String): ZManaged[Blocking, IOException, FileHandle] = {
+      // An effect that acquires the resource:
+      val openFile = open(file)
+
+      // releases the resource:
+      val closeFile: FileHandle => ZIO[Blocking, Nothing, Unit] = _.close.orDie
+
+      ZManaged.make(openFile)(closeFile)
+    }
   }
 
   /**
@@ -163,7 +173,12 @@ object CatIncremental extends App {
    * a time, stopping when there are no more chunks left.
    */
   def cat(fh: FileHandle): ZIO[Blocking with Console, IOException, Unit] =
-    ???
+    fh.read.flatMap { value =>
+      value match {
+        case None        => ZIO.unit
+        case Some(chunk) => putStr(chunk.mkString("\n")) zipRight (cat(fh))
+      }
+    }
 
   /**
    * EXERCISE
@@ -181,8 +196,7 @@ object CatIncremental extends App {
          * Open the specified file, safely create and use a file handle to
          * incrementally dump the contents of the file to standard output.
          */
-        ???
-
+        FileHandle.make(args(0)).use(cat).orDie as ExitCode(0)
       case _ => putStrLn("Usage: cat <file>") as ExitCode(2)
     }
 }
