@@ -69,13 +69,28 @@ object ParallelFib extends App {
     loop(n, n)
   }
 
+  def fibPar(n: Int): UIO[BigInt] = {
+    def loop(n: Int): UIO[BigInt] =
+      if (n <= 1) UIO(n)
+      else
+        (for {
+          fiberN1 <- loop(n - 1).fork
+          fiberN2 <- loop(n - 2).fork
+          N1      <- fiberN1.join
+          N2      <- fiberN2.join
+          sum     <- UIO(N1 + N2)
+        } yield sum)
+    loop(n)
+  }
+
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     for {
-      _ <- putStrLn(
-            "What number of the fibonacci sequence should we calculate?"
-          )
-      n <- getStrLn.orDie.flatMap(input => ZIO(input.toInt)).eventually
-      f <- fib(n)
+      // _ <- putStrLn(
+      //       "What number of the fibonacci sequence should we calculate?"
+      //     )
+      // n <- getStrLn.orDie.flatMap(input => ZIO(input.toInt)).eventually
+      n <- UIO(10)
+      f <- fibPar(n)
       _ <- putStrLn(s"fib(${n}) = ${f}")
     } yield ExitCode.success
 }
