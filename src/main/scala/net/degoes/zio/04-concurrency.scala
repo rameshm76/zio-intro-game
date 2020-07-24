@@ -16,7 +16,12 @@ object ForkJoin extends App {
    * and finally, print out a message "Joined".
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    printer.exitCode
+    (for {
+      fiber <- printer.fork
+      _     <- putStrLn("Forked")
+      _     <- fiber.join
+      _     <- putStrLn("Joined")
+    } yield ()).exitCode
 }
 
 object ForkInterrupt extends App {
@@ -24,7 +29,7 @@ object ForkInterrupt extends App {
   import zio.duration._
 
   val infinitePrinter =
-    putStrLn(".").forever
+    putStr(".").forever
 
   /**
    * EXERCISE
@@ -35,7 +40,14 @@ object ForkInterrupt extends App {
    * finally, print out a message "Interrupted".
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    (infinitePrinter *> ZIO.sleep(10.millis)).exitCode
+    (for {
+      fiber <- infinitePrinter.fork
+      _     <- putStrLn("Forked")
+      _     <- ZIO.sleep(10.millis)
+      _     <- fiber.interrupt
+      _     <- putStrLn("Interrupted")
+    } yield ()).exitCode
+//    (infinitePrinter *> ZIO.sleep(10.millis)).exitCode
 }
 
 object ParallelFib extends App {
@@ -263,9 +275,7 @@ object StmQueue extends App {
     for {
       queue <- Queue.bounded[Int](10)
       _     <- ZIO.foreach(0 to 100)(i => queue.offer(i)).fork
-      _ <- ZIO.foreach(0 to 100)(
-            _ => queue.take.flatMap(i => putStrLn(s"Got: ${i}"))
-          )
+      _     <- ZIO.foreach(0 to 100)(_ => queue.take.flatMap(i => putStrLn(s"Got: ${i}")))
     } yield ExitCode.success
 }
 
@@ -333,12 +343,11 @@ object StmLunchTime extends App {
     val TableSize = 5
 
     for {
-      attendees <- ZIO.foreach(0 to Attendees)(
-                    i =>
-                      TRef
-                        .make[Attendee.State](Attendee.State.Starving)
-                        .map(Attendee(_))
-                        .commit
+      attendees <- ZIO.foreach(0 to Attendees)(i =>
+                    TRef
+                      .make[Attendee.State](Attendee.State.Starving)
+                      .map(Attendee(_))
+                      .commit
                   )
       table <- TArray
                 .fromIterable(List.fill(TableSize)(false))
@@ -495,10 +504,8 @@ object StmDiningPhilosophers extends App {
     val makeFork = TRef.make[Option[Fork]](Some(Fork))
 
     (for {
-      allForks0 <- STM.foreach(0 to size) { i =>
-                    makeFork
-                  }
-      allForks = allForks0 ++ List(allForks0(0))
+      allForks0 <- STM.foreach(0 to size)(i => makeFork)
+      allForks  = allForks0 ++ List(allForks0(0))
       placements = (allForks zip allForks.drop(1)).map {
         case (l, r) => Placement(l, r)
       }
@@ -526,9 +533,7 @@ object StmDiningPhilosophers extends App {
     val count = 10
 
     def eaters(table: Roundtable): Iterable[ZIO[Console, Nothing, Unit]] =
-      (0 to count).map { index =>
-        eat(index, table)
-      }
+      (0 to count).map(index => eat(index, table))
 
     for {
       table <- setupTable(count)
