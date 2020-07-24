@@ -118,6 +118,8 @@ object AlarmAppImproved extends App {
     } yield duration
   }
 
+  val printsEverySecond = (ZIO.sleep(1.second) *> putStr(". ")).forever
+
   /**
    * EXERCISE
    *
@@ -127,7 +129,13 @@ object AlarmAppImproved extends App {
    * prints out a wakeup alarm message, like "Time to wakeup!!!".
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    (for {
+      duration <- UIO(Duration((5 * 1000.0).toLong, TimeUnit.MILLISECONDS)) //getAlarmDuration
+      fiber    <- printsEverySecond.fork
+      _        <- ZIO.sleep(duration)
+      _        <- fiber.interrupt
+      _        <- putStrLn("Time to wakeup!!!")
+    } yield ()).exitCode
 }
 
 object ComputePi extends App {
