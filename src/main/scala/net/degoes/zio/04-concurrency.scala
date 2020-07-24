@@ -69,6 +69,7 @@ object ParallelFib extends App {
     loop(n, n)
   }
 
+  // will add memoization one stm is learned
   def fibPar(n: Int): UIO[BigInt] = {
     def loop(n: Int): UIO[BigInt] =
       if (n <= 1) UIO(n)
@@ -85,11 +86,10 @@ object ParallelFib extends App {
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     for {
-      // _ <- putStrLn(
-      //       "What number of the fibonacci sequence should we calculate?"
-      //     )
-      // n <- getStrLn.orDie.flatMap(input => ZIO(input.toInt)).eventually
-      n <- UIO(10)
+      _ <- putStrLn(
+            "What number of the fibonacci sequence should we calculate?"
+          )
+      n <- getStrLn.orDie.flatMap(input => ZIO(input.toInt)).eventually
       f <- fibPar(n)
       _ <- putStrLn(s"fib(${n}) = ${f}")
     } yield ExitCode.success
