@@ -41,7 +41,7 @@ object CatBracket extends App {
     effectBlockingIO(scala.io.Source.fromFile(file))
 
   //had to rewrite the new close function
-  def close(source: Source) =
+  def close(source: Source): UIO[Unit] =
     ZIO.succeed(source.close())
 
   /**
@@ -94,7 +94,7 @@ object SourceManaged extends App {
       val close: ZSource => ZIO[Blocking, Nothing, Unit] =
         _.execute(_.close()).orDie
 
-      ???
+      ZManaged.make(open)(close)
     }
   }
 
@@ -105,9 +105,14 @@ object SourceManaged extends App {
    * to read the contents of all files in parallel, but ensuring that if anything
    * goes wrong during parallel reading, all files are safely closed.
    */
-  def readFiles(
-    files: List[String]
-  ): ZIO[Blocking with Console, IOException, List[String]] = ???
+  def readFiles(files: List[String]): ZIO[Blocking with Console, IOException, List[String]] =
+    (ZManaged.foreachPar(files)(file => ZSource.make(file))).use(sources => readFilesFromZsources(sources))
+
+  def readFilesFromZsources(zSources: List[ZSource]): ZIO[Blocking with Console, IOException, List[String]] =
+    ZIO.foreach(zSources)(zsource => zsource.execute(src => src.getLines().mkString("\n")))
+// src.getLines().mkString("\n")
+  val base = "/home/renghen/Documents"
+  val lst  = List(s"$base/links.txt", s"$base/links1.txt", s"$base/links3.txt")
 
   /**
    * EXERCISE
@@ -118,7 +123,9 @@ object SourceManaged extends App {
    * anything except an error message.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    readFiles(lst)
+      .foldM(failure => putStrLn("error opening files"), contents => putStrLn(contents.mkString("\n")))
+      .exitCode
 }
 
 object CatIncremental extends App {
