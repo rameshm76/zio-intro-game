@@ -277,10 +277,29 @@ object StmSwap extends App {
    *
    * Using `STM`, implement a safe version of the swap function.
    */
-  def exampleStm: UIO[Int] = ???
+  def exampleStm: UIO[Int] = {
+    def swap[A](ref1: TRef[A], ref2: TRef[A]) =
+      for {
+        v1 <- ref1.get
+        v2 <- ref2.get
+        _  <- ref2.set(v1)
+        _  <- ref1.set(v2)
+      } yield ()
+
+    for {
+      ref1   <- STM.atomically(TRef.make(100))
+      ref2   <- STM.atomically(TRef.make(0))
+      fiber1 <- STM.atomically(swap(ref1, ref2)).repeat(Schedule.recurs(100)).fork
+      fiber2 <- STM.atomically(swap(ref2, ref1)).repeat(Schedule.recurs(100)).fork
+      _      <- (fiber1 zip fiber2).join
+      value  <- STM.atomically((ref1.get zipWith ref2.get)(_ + _))
+    } yield value
+
+  }
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    exampleRef.map(_.toString).flatMap(putStrLn(_)).exitCode
+    exampleRef.map(_.toString).flatMap(putStrLn(_)) *>
+      exampleStm.map(_.toString).flatMap(putStrLn(_)).exitCode
 }
 
 object StmLock extends App {
