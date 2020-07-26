@@ -173,13 +173,29 @@ object ComputePi extends App {
   val randomPoint: ZIO[Random, Nothing, (Double, Double)] =
     nextDouble zip nextDouble
 
+  val makePiState = for {
+    inside  <- Ref.make(0L)
+    total   <- Ref.make(0L)
+    piState <- UIO(PiState(inside, total))
+  } yield piState
+
   def addPoints(piState: PiState, numberOfPoints: Int = 100): ZIO[Random, NoSuchElementException, Unit] = {
-    val add = for {
-      (x, y) <- randomPoint
-      _      <- piState.total.update(_ + 1)
-      _      <- if (insideCircle(x, y)) piState.inside.update(_ + 1) else IO.unit
+    val add = (localPiState: PiState) =>
+      for {
+        (x, y) <- randomPoint
+        _      <- localPiState.total.update(_ + 1)
+        _      <- if (insideCircle(x, y)) localPiState.inside.update(_ + 1) else IO.unit
+      } yield ()
+
+    for {
+      localPiState <- makePiState
+      _            <- add(localPiState).repeat(Schedule.recurs(numberOfPoints - 1)).unit
+      total        <- localPiState.total.get
+      _            <- piState.total.update(_ + total)
+      inside       <- localPiState.inside.get
+      _            <- piState.inside.update(_ + inside)
     } yield ()
-    add.repeat(Schedule.recurs(numberOfPoints - 1)).unit
+
   }
 
   def printEstimate(piState: PiState) =
@@ -200,10 +216,8 @@ object ComputePi extends App {
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
     (for {
-      inside  <- Ref.make(0L)
-      total   <- Ref.make(0L)
-      piState <- UIO(PiState(inside, total))
-      fibers  <- ZIO.foreach(1 to 100000)(_ => addPoints(piState, 1000).fork)
+      piState <- makePiState
+      fibers  <- ZIO.foreach(1 to 100)(_ => addPoints(piState, 100).fork)
       _       <- ZIO.foreach(fibers)(_.join)
       _       <- printEstimate(piState)
     } yield ()).exitCode
