@@ -287,8 +287,8 @@ object StmSwap extends App {
       } yield ()
 
     for {
-      ref1   <- STM.atomically(TRef.make(100))
-      ref2   <- STM.atomically(TRef.make(0))
+      ref1   <- TRef.makeCommit(100)
+      ref2   <- TRef.makeCommit(0)
       fiber1 <- STM.atomically(swap(ref1, ref2)).repeat(Schedule.recurs(100)).fork
       fiber2 <- STM.atomically(swap(ref2, ref1)).repeat(Schedule.recurs(100)).fork
       _      <- (fiber1 zip fiber2).join
@@ -313,11 +313,12 @@ object StmLock extends App {
    * acquisition, and release methods.
    */
   class Lock private (tref: TRef[Boolean]) {
-    def acquire: UIO[Unit] = ???
-    def release: UIO[Unit] = ???
+    def acquire: UIO[Unit] = STM.atomically({ tref.set(true) }) //we may later add error if it is alreay true
+    def release: UIO[Unit] =
+      STM.atomically({ tref.set(false) }) //we may later add error so that we can only release when true
   }
   object Lock {
-    def make: UIO[Lock] = ???
+    def make: UIO[Lock] = TRef.makeCommit(true).flatMap(tref => ZIO.succeed(new Lock(tref)))
   }
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
