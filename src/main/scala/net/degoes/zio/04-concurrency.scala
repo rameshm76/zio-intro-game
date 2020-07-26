@@ -173,6 +173,25 @@ object ComputePi extends App {
   val randomPoint: ZIO[Random, Nothing, (Double, Double)] =
     nextDouble zip nextDouble
 
+  def addPoints(piState: PiState, numberOfPoints: Int = 100): ZIO[Random, NoSuchElementException, Unit] = {
+    val add = for {
+      (x, y) <- randomPoint
+      _      <- piState.total.update(_ + 1)
+      _      <- if (insideCircle(x, y)) piState.inside.update(_ + 1) else IO.unit
+    } yield ()
+    add.repeat(Schedule.recurs(numberOfPoints - 1)).unit
+  }
+
+  def printEstimate(piState: PiState) =
+    for {
+      total  <- piState.total.get
+      inside <- piState.inside.get
+      _ <- {
+        val pi = estimatePi(inside, total)
+        putStrLn(s"inside = $inside, total= $total, estimated Pi = $pi")
+      }
+    } yield ()
+
   /**
    * EXERCISE
    *
@@ -180,7 +199,14 @@ object ComputePi extends App {
    * ongoing estimates continuously until the estimation is complete.
    */
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
-    ???
+    (for {
+      inside  <- Ref.make(0L)
+      total   <- Ref.make(0L)
+      piState <- UIO(PiState(inside, total))
+      fibers  <- ZIO.foreach(1 to 100000)(_ => addPoints(piState, 1000).fork)
+      _       <- ZIO.foreach(fibers)(_.join)
+      _       <- printEstimate(piState)
+    } yield ()).exitCode
 }
 
 object ParallelZip extends App {
