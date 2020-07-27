@@ -393,9 +393,15 @@ object StmLunchTime extends App {
   final case class Attendee(state: TRef[Attendee.State]) {
     import Attendee.State._
 
-    def isStarving: STM[Nothing, Boolean] = ???
+    def isStarving: STM[Nothing, Boolean] =
+      for {
+        valueState <- state.get
+      } yield (valueState == Starving)
 
-    def feed: STM[Nothing, Unit] = ???
+    def feed: STM[Nothing, Unit] =
+      for {
+        _ <- state.set(Full)
+      } yield ()
   }
   object Attendee {
     sealed trait State
@@ -420,9 +426,15 @@ object StmLunchTime extends App {
         }
         .map(_._2)
 
-    def takeSeat(index: Int): STM[Nothing, Unit] = ???
+    def takeSeat(index: Int): STM[Nothing, Unit] =
+      for {
+        _ <- seats.update(index, _ => true)
+      } yield ()
 
-    def vacateSeat(index: Int): STM[Nothing, Unit] = ???
+    def vacateSeat(index: Int): STM[Nothing, Unit] =
+      for {
+        _ <- seats.update(index, _ => false)
+      } yield ()
   }
 
   /**
@@ -430,7 +442,14 @@ object StmLunchTime extends App {
    *
    * Using STM, implement a method that feeds a single attendee.
    */
-  def feedAttendee(t: Table, a: Attendee): STM[Nothing, Unit] = ???
+  def feedAttendee(t: Table, a: Attendee): STM[Nothing, Unit] =
+    for {
+      seatIdOption <- t.findEmptySeat
+      _ <- seatIdOption match {
+            case None     => STM.retry
+            case Some(id) => t.takeSeat(id) *> a.feed *> t.vacateSeat(id)
+          }
+    } yield ()
 
   /**
    * EXERCISE
@@ -438,7 +457,12 @@ object StmLunchTime extends App {
    * Using STM, implement a method that feeds only the starving attendees.
    */
   def feedStarving(table: Table, list: List[Attendee]): UIO[Unit] =
-    ???
+    STM.atomically {
+      for {
+        starving <- ZSTM.filter(list)(_.isStarving)
+        _        <- ZSTM.collect(starving)(a => feedAttendee(table, a))
+      } yield ()
+    }
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] = {
     val Attendees = 100
