@@ -1,6 +1,9 @@
 package net.degoes.zio
 
 import zio._
+import net.degoes.zio.CakeEnvironment.Files
+import net.degoes.zio.CakeEnvironment.Logging
+import scala.io.Source
 
 object AccessEnvironment extends App {
   import zio.console._
@@ -13,7 +16,7 @@ object AccessEnvironment extends App {
    * Using `ZIO.access`, access a `Config` type from the environment, and
    * extract the `server` field from it.
    */
-  val accessServer: ZIO[Config, Nothing, String] = ???
+  val accessServer: ZIO[Config, Nothing, String] = ZIO.access(_.server)
 
   /**
    * EXERCISE
@@ -21,7 +24,7 @@ object AccessEnvironment extends App {
    * Using `ZIO.access`, access a `Config` type from the environment, and
    * extract the `port` field from it.
    */
-  val accessPort: ZIO[Config, Nothing, Int] = ???
+  val accessPort: ZIO[Config, Nothing, Int] = ZIO.access(_.port)
 
   def run(args: List[String]) = {
     val config = Config("localhost", 7878)
@@ -59,8 +62,12 @@ object ProvideEnvironment extends App {
    */
   def run(args: List[String]) = {
     val config = Config("localhost", 7878)
-
-    ???
+    val dbConn = DatabaseConnection()
+    (for {
+      server <- getServer.provide(config)
+      result <- useDatabaseConnection.provide(dbConn).orDie
+      _      <- putStrLn(result.toString())
+    } yield ExitCode.success)
   }
 }
 
@@ -95,6 +102,19 @@ object CakeEnvironment extends App {
       _    <- Logging.log(file)
     } yield ()
 
+  val myFx: MyFx = new Logging with Files {
+
+    override val logging: Logging.Service = new Logging.Service {
+      override def log(line: String): UIO[Unit] = ZIO.effectTotal(println(line))
+    }
+
+    override val files: Files.Service = new Files.Service {
+      def read(file: String): IO[IOException, String] =
+        Task(Source.fromFile(file).getLines().mkString("\n")).refineToOrDie[IOException]
+    }
+
+  }
+
   /**
    * EXERCISE
    *
@@ -104,7 +124,7 @@ object CakeEnvironment extends App {
    */
   def run(args: List[String]) =
     effect
-      .provide(???)
+      .provide(myFx)
       .exitCode
 }
 
