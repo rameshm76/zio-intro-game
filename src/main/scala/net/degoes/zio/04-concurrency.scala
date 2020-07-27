@@ -499,12 +499,60 @@ object StmPriorityQueue extends App {
     minLevel: TRef[Option[Int]],
     map: TMap[Int, TQueue[A]]
   ) {
-    def offer(a: A, priority: Int): STM[Nothing, Unit] = ???
 
-    def take: STM[Nothing, A] = ???
+    final val boundQueueSize: Int = 100
+
+    def offer(a: A, priority: Int): STM[Nothing, Unit] =
+      for {
+        queueOption <- map.get(priority)
+        queue <- queueOption match {
+                  case None => // if queue does not exist we create one and we put it in the map
+                    for {
+                      tq <- TQueue.bounded[A](boundQueueSize) //create
+                      _  <- map.put(priority, tq)             //put in map
+                    } yield tq
+                  case Some(q) => STM.succeed(q) // we put in stm because we are in the stm monad
+                }
+        _ <- queue.offer(a)
+        _ <- minLevel.update(op => //we need to change the minlevl priority
+              op match {
+                case None       => Some(priority)
+                case Some(prev) => Some(prev.min(priority))
+              } //we can use a fold to be more succint
+            )
+      } yield ()
+
+    def take: STM[Nothing, A] =
+      for {
+        minLevelOption <- minLevel.get
+        queueOption <- minLevelOption match {
+                        case None        => STM.retry
+                        case Some(value) => map.get(value)
+                      }
+        queue <- queueOption match {
+                  case None    => STM.retry
+                  case Some(q) => STM.succeed(q) // we put in stm because we are in the stm monad
+                }
+        item         <- queue.take
+        isQueueEmpty <- queue.isEmpty
+        keys         <- map.keys
+        _ <- minLevel.update(op => //we need to change the minlevel priority
+              op match {
+                case None => None
+                case Some(prev) =>
+                  if (isQueueEmpty) { //if Q is empty we find the next higher priority
+                    keys.filter(_ > prev).sorted.headOption
+                  } else { Some(prev) }
+              }
+            )
+      } yield (item)
   }
   object PriorityQueue {
-    def make[A]: STM[Nothing, PriorityQueue[A]] = ???
+    def make[A]: STM[Nothing, PriorityQueue[A]] =
+      for {
+        minLevel <- TRef.make[Option[Int]](None)
+        tMap     <- TMap.empty[Int, TQueue[A]]
+      } yield new PriorityQueue(minLevel, tMap)
   }
 
   def run(args: List[String]): ZIO[ZEnv, Nothing, ExitCode] =
