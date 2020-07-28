@@ -150,7 +150,7 @@ object HasMap extends App {
   val database = allThree.get[Database]
   val cache    = allThree.get[Cache]
 
-  def run(args: List[String]) = ??? //it would there is no problem to solve
+  def run(args: List[String]) = ??? //there is no problem to solve
 
 }
 
@@ -173,7 +173,10 @@ object LayerEnvironment extends App {
      * Using `ZLayer.succeed`, create a layer that implements the `Files`
      * service.
      */
-    val live: ZLayer[Blocking, Nothing, Files] = ???
+    val live: ZLayer[Blocking, Nothing, Files] = ZLayer.succeed(new Service {
+      override def read(file: String): IO[IOException, String] =
+        Task(Source.fromFile(file).getLines().mkString("\n")).refineToOrDie[IOException]
+    })
 
     def read(file: String) = ZIO.accessM[Files](_.get.read(file))
   }
@@ -190,7 +193,11 @@ object LayerEnvironment extends App {
      * Using `ZLayer.fromFunction`, create a layer that requires `Console`
      * and uses the console to provide a logging service.
      */
-    val live: ZLayer[Console, Nothing, Logging] = ???
+    val live: ZLayer[Console, Nothing, Logging] = ZLayer.fromFunction(Console =>
+      new Service {
+        override def log(line: String): zio.UIO[Unit] = ZIO.effectTotal(println(line))
+      }
+    )
 
     def log(line: String) = ZIO.accessM[Logging](_.get.log(line))
   }
@@ -210,8 +217,8 @@ object LayerEnvironment extends App {
      * You will have to build a value (the environment) of the required type
      * (`Files with Logging`).
      */
-    val env: ZLayer[Console, Nothing, Files with Logging] =
-      ???
+    val env: ZLayer[Blocking with Console, Nothing, Files with Logging] =
+      Files.live ++ Logging.live
 
     effect
       .provideCustomLayer(env)
