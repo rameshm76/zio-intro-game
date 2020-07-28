@@ -150,7 +150,8 @@ object HasMap extends App {
   val database = allThree.get[Database]
   val cache    = allThree.get[Cache]
 
-  def run(args: List[String]) = ???
+  def run(args: List[String]) = ??? //it would there is no problem to solve
+
 }
 
 object LayerEnvironment extends App {
