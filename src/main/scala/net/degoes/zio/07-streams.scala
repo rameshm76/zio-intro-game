@@ -1,9 +1,8 @@
 package net.degoes.zio
-
-object ConsoleInput {
+import zio._
+object ConsoleInput extends App {
   import java.io.IOException
 
-  import zio._
   import zio.console._
   import zio.stream._
 
@@ -13,13 +12,13 @@ object ConsoleInput {
    * Using `ZStream.fromEffect` and `getStrLn`, construct a stream that
    * will emit a single string, taken from the console.
    */
-  val singleRead: ZStream[Console, IOException, String] = ???
+  val singleRead: ZStream[Console, IOException, String] = ZStream.fromEffect(getStrLn)
 
   /**
    * Using `ZStream#forever`, take the `singleRead` stream, and turn it into
    * a stream that repeats forever.
    */
-  val consoleInput: ZStream[Console, IOException, String] = ???
+  val consoleInput: ZStream[Console, IOException, String] = singleRead.forever
 
   sealed trait Command
   object Command {
@@ -38,4 +37,5 @@ object ConsoleInput {
       .takeUntil(_ == Command.Quit)
       .runDrain
       .ignore as ExitCode.success
+
 }
